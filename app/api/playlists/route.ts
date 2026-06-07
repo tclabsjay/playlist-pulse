@@ -4,7 +4,7 @@ import { addPlaylist, getPlaylists, playlistExists } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
-const ADMIN_PIN = "pulse2025";
+const ADMIN_PIN = "582047";
 
 function extractPlaylistId(input: string): string | null {
   try {

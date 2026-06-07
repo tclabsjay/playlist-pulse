@@ -3,7 +3,7 @@ import { findById, removePlaylist } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
-const ADMIN_PIN = "pulse2025";
+const ADMIN_PIN = "582047";
 
 export async function DELETE(
   req: NextRequest,

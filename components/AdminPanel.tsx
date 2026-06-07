@@ -148,11 +148,15 @@ export default function AdminPanel() {
                 <div>
                   <label className="block text-xs font-medium text-white/60 mb-1.5">Admin PIN</label>
                   <input
-                    type="password"
+                    type="number"
+                    inputMode="numeric"
                     value={pin}
                     onChange={(e) => setPin(e.target.value)}
-                    placeholder="Enter PIN"
+                    placeholder="6-digit PIN"
                     required
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
                     className="w-full bg-[#111] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-orange-500/50 transition-colors"
                   />
                 </div>
