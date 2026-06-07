@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Header from "@/components/Header";
 import TrackList from "@/components/TrackList";
-import { getPlaylist } from "@/lib/spotify";
+import { getPlaylist, SpotifyError } from "@/lib/spotify";
 
 export async function generateMetadata({ params }: { params: { id: string } }) {
   try {
@@ -17,12 +17,71 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
   }
 }
 
+function ErrorState({ title, message }: { title: string; message: string }) {
+  return (
+    <div className="min-h-screen bg-[#121212]">
+      <Header />
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-white/50 hover:text-white text-sm mt-6 mb-8 transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          Back
+        </Link>
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-6">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 8v4M12 16h.01" />
+            </svg>
+          </div>
+          <h1 className="text-white text-2xl font-bold mb-3">{title}</h1>
+          <p className="text-white/50 text-sm max-w-md mb-8">{message}</p>
+          <Link
+            href="/"
+            className="bg-[#1DB954] hover:bg-[#1ed760] text-black font-bold text-sm px-6 py-3 rounded-full transition-colors"
+          >
+            Browse Playlists
+          </Link>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 export default async function PlaylistPage({ params }: { params: { id: string } }) {
-  let playlist;
+  let playlist: Awaited<ReturnType<typeof getPlaylist>>;
+
   try {
     playlist = await getPlaylist(params.id);
-  } catch {
-    notFound();
+  } catch (err) {
+    if (err instanceof SpotifyError) {
+      if (err.status === 404) notFound();
+      if (err.status === 403) {
+        return (
+          <ErrorState
+            title="Playlist not accessible"
+            message="This playlist is private or restricted. Only public Spotify playlists can be viewed here."
+          />
+        );
+      }
+      return (
+        <ErrorState
+          title="Couldn't load playlist"
+          message={`Spotify returned an error (${err.status}). The playlist may have been deleted or is unavailable in your region.`}
+        />
+      );
+    }
+    // Missing credentials or network error
+    return (
+      <ErrorState
+        title="Spotify not connected"
+        message="Spotify API credentials are not configured. Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to your Vercel environment variables."
+      />
+    );
   }
 
   const imageUrl = playlist.images?.[0]?.url;
@@ -43,7 +102,6 @@ export default async function PlaylistPage({ params }: { params: { id: string } 
           Back
         </Link>
 
-        {/* Playlist header */}
         <div className="flex flex-col sm:flex-row gap-6 mb-10">
           <div className="shrink-0">
             {imageUrl ? (
@@ -98,7 +156,6 @@ export default async function PlaylistPage({ params }: { params: { id: string } 
           </div>
         </div>
 
-        {/* Track list */}
         <div className="bg-[#181818] rounded-xl p-2">
           <TrackList tracks={trackItems} />
         </div>

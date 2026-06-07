@@ -60,6 +60,13 @@ async function getAccessToken(): Promise<string> {
   return data.access_token as string;
 }
 
+export class SpotifyError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = "SpotifyError";
+  }
+}
+
 async function spotifyFetch<T>(path: string, revalidate = 300): Promise<T> {
   const token = await getAccessToken();
   const res = await fetch(`https://api.spotify.com/v1${path}`, {
@@ -68,7 +75,7 @@ async function spotifyFetch<T>(path: string, revalidate = 300): Promise<T> {
   });
 
   if (!res.ok) {
-    throw new Error(`Spotify API error: ${res.status} ${res.statusText} — ${path}`);
+    throw new SpotifyError(res.status, `Spotify API returned ${res.status} for ${path}`);
   }
 
   return res.json() as Promise<T>;
