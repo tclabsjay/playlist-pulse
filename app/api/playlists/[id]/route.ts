@@ -3,24 +3,27 @@ import { findById, removePlaylist } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
+const DEFAULT_PIN = "pulse2025";
+
+function getAdminPin() {
+  return process.env.ADMIN_PIN ?? DEFAULT_PIN;
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
 
-  // If ADMIN_PIN env var is set, require it to delete
-  const adminPin = process.env.ADMIN_PIN;
-  if (adminPin) {
-    let body: { pin?: string } = {};
-    try {
-      body = await req.json();
-    } catch {
-      // body is optional if no PIN required
-    }
-    if (!body.pin || body.pin !== adminPin) {
-      return NextResponse.json({ message: "Incorrect admin PIN." }, { status: 403 });
-    }
+  let body: { pin?: string } = {};
+  try {
+    body = await req.json();
+  } catch {
+    // ignore parse errors
+  }
+
+  if (!body.pin || body.pin !== getAdminPin()) {
+    return NextResponse.json({ message: "Incorrect admin PIN." }, { status: 403 });
   }
 
   const playlist = await findById(id);

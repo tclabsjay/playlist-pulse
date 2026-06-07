@@ -4,6 +4,12 @@ import { addPlaylist, getPlaylists, playlistExists } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
+const DEFAULT_PIN = "pulse2025";
+
+function getAdminPin() {
+  return process.env.ADMIN_PIN ?? DEFAULT_PIN;
+}
+
 function extractPlaylistId(input: string): string | null {
   try {
     const url = new URL(input);
@@ -28,15 +34,18 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { spotifyUrl?: string; curatorName?: string };
+  let body: { spotifyUrl?: string; curatorName?: string; pin?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { spotifyUrl = "", curatorName = "" } = body;
+  const { spotifyUrl = "", curatorName = "", pin = "" } = body;
 
+  if (!pin.trim() || pin.trim() !== getAdminPin()) {
+    return NextResponse.json({ message: "Incorrect admin PIN." }, { status: 403 });
+  }
   if (!spotifyUrl.trim()) {
     return NextResponse.json({ message: "Spotify URL is required." }, { status: 400 });
   }
