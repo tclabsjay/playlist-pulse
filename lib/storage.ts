@@ -6,11 +6,10 @@ export interface StoredPlaylist {
   imageUrl: string;
   trackCount: number;
   curatorName: string;
-  pinHash: string;
   addedAt: string;
 }
 
-export type PublicPlaylist = Omit<StoredPlaylist, "pinHash">;
+export type PublicPlaylist = StoredPlaylist;
 
 // In-memory fallback — works within one serverless instance.
 // Add a Vercel KV store (dashboard → Storage → Create KV) for full persistence.
@@ -45,8 +44,7 @@ async function writeAll(list: StoredPlaylist[]): Promise<void> {
 }
 
 export async function getPlaylists(): Promise<PublicPlaylist[]> {
-  const all = await readAll();
-  return all.map(({ pinHash: _, ...p }) => p);
+  return readAll();
 }
 
 export async function findById(id: string): Promise<StoredPlaylist | null> {

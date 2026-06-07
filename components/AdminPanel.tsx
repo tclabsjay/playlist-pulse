@@ -20,7 +20,6 @@ export default function AdminPanel() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [url, setUrl] = useState("");
   const [curatorName, setCuratorName] = useState("");
-  const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -43,7 +42,7 @@ export default function AdminPanel() {
       const res = await fetch("/api/playlists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spotifyUrl: url, curatorName, pin }),
+        body: JSON.stringify({ spotifyUrl: url, curatorName }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -53,7 +52,6 @@ export default function AdminPanel() {
       setPlaylists((prev) => [data, ...prev]);
       setUrl("");
       setCuratorName("");
-      setPin("");
       setSuccess(`"${data.name}" added successfully!`);
     } catch {
       setError("Network error — please try again.");
@@ -63,13 +61,23 @@ export default function AdminPanel() {
   }
 
   async function handleDelete(id: string) {
-    const enteredPin = window.prompt("Enter the Admin PIN used when adding this playlist:");
-    if (!enteredPin) return;
-    const res = await fetch(`/api/playlists/${id}`, {
+    // Try delete without PIN first; if server requires one, prompt
+    let res = await fetch(`/api/playlists/${id}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin: enteredPin }),
+      body: JSON.stringify({}),
     });
+
+    if (res.status === 403) {
+      const pin = window.prompt("Enter your Admin PIN to remove this playlist:");
+      if (!pin) return;
+      res = await fetch(`/api/playlists/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+    }
+
     if (res.ok) {
       setPlaylists((prev) => prev.filter((p) => p.id !== id));
     } else {
@@ -133,29 +141,16 @@ export default function AdminPanel() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-white/60 mb-1.5">Curator Name</label>
-                  <input
-                    type="text"
-                    value={curatorName}
-                    onChange={(e) => setCuratorName(e.target.value)}
-                    placeholder="Your name"
-                    required
-                    className="w-full bg-[#111] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-orange-500/50 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-white/60 mb-1.5">Admin PIN</label>
-                  <input
-                    type="password"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    placeholder="••••••"
-                    required
-                    className="w-full bg-[#111] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-orange-500/50 transition-colors"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1.5">Curator Name</label>
+                <input
+                  type="text"
+                  value={curatorName}
+                  onChange={(e) => setCuratorName(e.target.value)}
+                  placeholder="Your name"
+                  required
+                  className="w-full bg-[#111] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-orange-500/50 transition-colors"
+                />
               </div>
 
               {error && (

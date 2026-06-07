@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHash } from "crypto";
 import { getPlaylist, SpotifyError } from "@/lib/spotify";
 import { addPlaylist, getPlaylists, playlistExists } from "@/lib/storage";
 
@@ -29,23 +28,20 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { spotifyUrl?: string; curatorName?: string; pin?: string };
+  let body: { spotifyUrl?: string; curatorName?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { spotifyUrl = "", curatorName = "", pin = "" } = body;
+  const { spotifyUrl = "", curatorName = "" } = body;
 
   if (!spotifyUrl.trim()) {
     return NextResponse.json({ message: "Spotify URL is required." }, { status: 400 });
   }
   if (!curatorName.trim()) {
     return NextResponse.json({ message: "Curator name is required." }, { status: 400 });
-  }
-  if (!pin.trim()) {
-    return NextResponse.json({ message: "Admin PIN is required." }, { status: 400 });
   }
 
   if (spotifyUrl.includes("spotify.link")) {
@@ -114,7 +110,6 @@ export async function POST(req: NextRequest) {
     imageUrl: spotifyData.images?.[0]?.url ?? "",
     trackCount: spotifyData.tracks.total,
     curatorName: curatorName.trim(),
-    pinHash: createHash("sha256").update(pin.trim()).digest("hex"),
     addedAt: new Date().toISOString(),
   };
 
@@ -125,6 +120,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Playlist validated but could not be saved. Storage may not be configured." }, { status: 500 });
   }
 
-  const { pinHash: _, ...publicEntry } = entry;
-  return NextResponse.json(publicEntry, { status: 201 });
+  return NextResponse.json(entry, { status: 201 });
 }
