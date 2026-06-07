@@ -35,6 +35,13 @@ export interface SpotifyCategory {
   icons: SpotifyImage[];
 }
 
+export class SpotifyError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = "SpotifyError";
+  }
+}
+
 async function getAccessToken(): Promise<string> {
   if (!CLIENT_ID || !CLIENT_SECRET) {
     throw new Error("Spotify credentials are not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET environment variables.");
@@ -53,18 +60,12 @@ async function getAccessToken(): Promise<string> {
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to authenticate with Spotify: ${res.status} ${res.statusText}`);
+    // Use SpotifyError so the API route can give a specific message
+    throw new SpotifyError(401, `Spotify authentication failed (${res.status}). Check that SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET are correct in Vercel environment variables.`);
   }
 
   const data = await res.json();
   return data.access_token as string;
-}
-
-export class SpotifyError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-    this.name = "SpotifyError";
-  }
 }
 
 async function spotifyFetch<T>(path: string, revalidate = 300): Promise<T> {

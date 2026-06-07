@@ -76,9 +76,15 @@ export async function POST(req: NextRequest) {
     spotifyData = await getPlaylist(playlistId);
   } catch (err) {
     if (err instanceof SpotifyError) {
+      if (err.status === 401) {
+        return NextResponse.json(
+          { message: "Spotify credentials are invalid. Double-check SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel → Project Settings → Environment Variables, then redeploy." },
+          { status: 500 }
+        );
+      }
       if (err.status === 404) {
         return NextResponse.json(
-          { message: "Playlist not found. Make sure it is public and the link is correct." },
+          { message: "Playlist not found. Make sure it is set to Public in Spotify." },
           { status: 404 }
         );
       }
@@ -88,17 +94,20 @@ export async function POST(req: NextRequest) {
           { status: 403 }
         );
       }
-    }
-    const isCredentialsError =
-      err instanceof Error && err.message.includes("credentials");
-    if (isCredentialsError) {
       return NextResponse.json(
-        { message: "Spotify API is not configured. Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to your Vercel environment variables." },
+        { message: `Spotify error ${err.status}: ${err.message}` },
         { status: 500 }
       );
     }
-    console.error("[playlists POST] Unexpected error:", err);
-    return NextResponse.json({ message: "Could not save Spotify playlist" }, { status: 500 });
+    if (err instanceof Error && err.message.includes("configured")) {
+      return NextResponse.json(
+        { message: "Spotify API credentials are missing. Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel → Project Settings → Environment Variables." },
+        { status: 500 }
+      );
+    }
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("[playlists POST] Unexpected error:", detail);
+    return NextResponse.json({ message: `Save failed: ${detail}` }, { status: 500 });
   }
 
   const entry: StoredPlaylist = {
