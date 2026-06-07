@@ -3,6 +3,21 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useTransition } from "react";
 
+function extractSpotifyPlaylistId(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.hostname === "open.spotify.com") {
+      const match = url.pathname.match(/\/playlist\/([a-zA-Z0-9]+)/);
+      return match ? match[1] : null;
+    }
+  } catch {
+    // not a URL
+  }
+  // also handle bare IDs like "spotify:playlist:3bkkoObW3FnXTVtnyAaTgv"
+  const uriMatch = value.match(/spotify:playlist:([a-zA-Z0-9]+)/);
+  return uriMatch ? uriMatch[1] : null;
+}
+
 export default function SearchBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -16,10 +31,15 @@ export default function SearchBar() {
       const input = form.elements.namedItem("q") as HTMLInputElement;
       const value = input.value.trim();
       startTransition(() => {
-        if (value) {
-          router.push(`/?q=${encodeURIComponent(value)}`);
-        } else {
+        if (!value) {
           router.push("/");
+          return;
+        }
+        const playlistId = extractSpotifyPlaylistId(value);
+        if (playlistId) {
+          router.push(`/playlist/${playlistId}`);
+        } else {
+          router.push(`/?q=${encodeURIComponent(value)}`);
         }
       });
     },
@@ -50,7 +70,7 @@ export default function SearchBar() {
           name="q"
           type="search"
           defaultValue={query}
-          placeholder="Search playlists, genres, moods…"
+          placeholder="Search or paste a Spotify playlist URL…"
           autoComplete="off"
           className="w-full bg-white/10 hover:bg-white/15 focus:bg-white/15 text-white placeholder-white/40 rounded-full py-3 pl-12 pr-12 text-base outline-none focus:ring-2 focus:ring-[#1DB954] transition-all"
         />
@@ -66,6 +86,9 @@ export default function SearchBar() {
           </button>
         )}
       </div>
+      <p className="text-white/30 text-xs mt-2 text-center">
+        Paste a Spotify playlist link to import it directly
+      </p>
     </form>
   );
 }
