@@ -115,17 +115,24 @@ export default function AdminPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ spotifyUrl: url, curatorName }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message ?? "Could not save playlist.");
+      const text = await res.text();
+      let data: { message?: string; name?: string } = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setError(`Server error (${res.status}) — ${text.slice(0, 300) || "empty response"}`);
         return;
       }
-      setPlaylists((prev) => [data, ...prev]);
+      if (!res.ok) {
+        setError(data.message ?? `Error ${res.status}`);
+        return;
+      }
+      setPlaylists((prev) => [data as Playlist, ...prev]);
       setUrl("");
       setCuratorName("");
       setSuccess(`"${data.name}" added successfully!`);
-    } catch {
-      setError("Network error — please try again.");
+    } catch (err) {
+      setError(`Network error — ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setLoading(false);
     }

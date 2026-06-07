@@ -101,22 +101,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: `Unexpected error: ${detail}` }, { status: 500 });
   }
 
-  const entry = {
-    id: spotifyData.id,
-    spotifyUrl: spotifyUrl.trim(),
-    name: spotifyData.name,
-    description: (spotifyData.description ?? "").replace(/<[^>]*>/g, ""),
-    imageUrl: spotifyData.images?.[0]?.url ?? "",
-    trackCount: spotifyData.tracks.total,
-    curatorName: curatorName.trim(),
-    addedAt: new Date().toISOString(),
-  };
+  let entry;
+  try {
+    entry = {
+      id: spotifyData.id,
+      spotifyUrl: spotifyUrl.trim(),
+      name: spotifyData.name,
+      description: (spotifyData.description ?? "").replace(/<[^>]*>/g, ""),
+      imageUrl: spotifyData.images?.[0]?.url ?? "",
+      trackCount: spotifyData.tracks?.total ?? 0,
+      curatorName: curatorName.trim(),
+      addedAt: new Date().toISOString(),
+    };
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error("[POST /api/playlists] Entry build error:", detail);
+    return NextResponse.json({ message: `Unexpected error building playlist entry: ${detail}` }, { status: 500 });
+  }
 
   try {
     await addPlaylist(entry);
   } catch (e) {
     console.error("[POST /api/playlists] Storage error:", e);
-    return NextResponse.json({ message: "Playlist validated but could not be saved. Storage may not be configured." }, { status: 500 });
+    return NextResponse.json({ message: "Playlist validated but could not be saved." }, { status: 500 });
   }
 
   return NextResponse.json(entry, { status: 201 });
