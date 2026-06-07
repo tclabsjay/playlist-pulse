@@ -4,8 +4,6 @@ import { addPlaylist, getPlaylists, playlistExists } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
-const ADMIN_PIN = "582047";
-
 function extractPlaylistId(input: string): string | null {
   try {
     const url = new URL(input);
@@ -30,25 +28,21 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { spotifyUrl?: string; curatorName?: string; pin?: string };
+  let body: { spotifyUrl?: string; curatorName?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { spotifyUrl = "", curatorName = "", pin = "" } = body;
+  const { spotifyUrl = "", curatorName = "" } = body;
 
-  if (!pin.trim() || pin.trim() !== ADMIN_PIN) {
-    return NextResponse.json({ message: "Incorrect admin PIN." }, { status: 403 });
-  }
   if (!spotifyUrl.trim()) {
     return NextResponse.json({ message: "Spotify URL is required." }, { status: 400 });
   }
   if (!curatorName.trim()) {
     return NextResponse.json({ message: "Curator name is required." }, { status: 400 });
   }
-
   if (spotifyUrl.includes("spotify.link")) {
     return NextResponse.json(
       { message: "Short spotify.link URLs are not supported. Open it in Spotify, tap ··· → Share → Copy link to get the full URL." },

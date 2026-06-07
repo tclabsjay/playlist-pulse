@@ -5,6 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import SpotifyStatus from "./SpotifyStatus";
 
+const ADMIN_PIN = "582047";
+
 interface Playlist {
   id: string;
   spotifyUrl: string;
@@ -16,22 +18,90 @@ interface Playlist {
   addedAt: string;
 }
 
+function PinGate({ onUnlock }: { onUnlock: () => void }) {
+  const [value, setValue] = useState("");
+  const [shake, setShake] = useState(false);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (value === ADMIN_PIN) {
+      onUnlock();
+    } else {
+      setShake(true);
+      setValue("");
+      setTimeout(() => setShake(false), 600);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center px-4">
+      <div className={`bg-[#1a1a1a] border border-white/5 rounded-2xl p-8 w-full max-w-xs text-center ${shake ? "animate-[shake_0.4s_ease]" : ""}`}>
+        <div className="w-10 h-10 rounded-full border-2 border-orange-500 flex items-center justify-center mx-auto mb-4">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-orange-400">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
+        <h1 className="text-white font-bold text-lg mb-1">Admin Access</h1>
+        <p className="text-white/40 text-xs mb-6">Enter your PIN to manage playlists</p>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            type="tel"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={value}
+            onChange={(e) => setValue(e.target.value.replace(/\D/g, ""))}
+            placeholder="PIN"
+            autoFocus
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            className="w-full bg-[#111] border border-white/10 rounded-lg px-4 py-3 text-white text-center text-xl tracking-widest placeholder-white/20 focus:outline-none focus:border-orange-500/50 transition-colors"
+          />
+          <button
+            type="submit"
+            className="w-full bg-orange-500 hover:bg-orange-400 text-black font-semibold py-3 rounded-lg transition-colors text-sm"
+          >
+            Unlock
+          </button>
+        </form>
+      </div>
+      <style>{`
+        @keyframes shake {
+          0%,100%{transform:translateX(0)}
+          20%{transform:translateX(-8px)}
+          40%{transform:translateX(8px)}
+          60%{transform:translateX(-5px)}
+          80%{transform:translateX(5px)}
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function AdminPanel() {
+  const [unlocked, setUnlocked] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [url, setUrl] = useState("");
   const [curatorName, setCuratorName] = useState("");
-  const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  useEffect(() => { loadPlaylists(); }, []);
+  useEffect(() => {
+    if (unlocked) loadPlaylists();
+  }, [unlocked]);
 
   async function loadPlaylists() {
     try {
       const res = await fetch("/api/playlists");
       if (res.ok) setPlaylists(await res.json());
     } catch {}
+  }
+
+  if (!unlocked) {
+    return <PinGate onUnlock={() => setUnlocked(true)} />;
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -43,7 +113,7 @@ export default function AdminPanel() {
       const res = await fetch("/api/playlists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spotifyUrl: url, curatorName, pin }),
+        body: JSON.stringify({ spotifyUrl: url, curatorName }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -53,7 +123,6 @@ export default function AdminPanel() {
       setPlaylists((prev) => [data, ...prev]);
       setUrl("");
       setCuratorName("");
-      setPin("");
       setSuccess(`"${data.name}" added successfully!`);
     } catch {
       setError("Network error — please try again.");
@@ -63,18 +132,12 @@ export default function AdminPanel() {
   }
 
   async function handleDelete(id: string) {
-    const enteredPin = window.prompt("Enter admin PIN to remove this playlist:");
-    if (!enteredPin) return;
-    const res = await fetch(`/api/playlists/${id}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin: enteredPin }),
-    });
+    if (!window.confirm("Remove this playlist?")) return;
+    const res = await fetch(`/api/playlists/${id}`, { method: "DELETE" });
     if (res.ok) {
       setPlaylists((prev) => prev.filter((p) => p.id !== id));
     } else {
-      const data = await res.json();
-      alert(data.message ?? "Could not remove playlist.");
+      alert("Could not remove playlist.");
     }
   }
 
@@ -89,9 +152,14 @@ export default function AdminPanel() {
             </svg>
             Return to Public View
           </Link>
-          <span className="text-xs text-orange-400 font-medium bg-orange-400/10 px-2.5 py-1 rounded-full">
-            Admin Access
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-orange-400 font-medium bg-orange-400/10 px-2.5 py-1 rounded-full">Admin Access</span>
+            <button onClick={() => setUnlocked(false)} className="text-white/20 hover:text-white/50 text-xs transition-colors" title="Lock">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -101,9 +169,8 @@ export default function AdminPanel() {
           Import and manage Spotify playlists for your public listening room.
         </p>
 
-        {/* Two-column layout: form left, status right */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 mb-10">
-          {/* Left — Add form */}
+          {/* Add form */}
           <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-1">
               <div className="w-6 h-6 rounded-full border-2 border-orange-500 flex items-center justify-center shrink-0">
@@ -111,9 +178,7 @@ export default function AdminPanel() {
               </div>
               <h2 className="text-base font-semibold">Add a Spotify Playlist</h2>
             </div>
-            <p className="text-white/30 text-xs mb-5 ml-9">
-              Paste a public Spotify playlist link to share it.
-            </p>
+            <p className="text-white/30 text-xs mb-5 ml-9">Paste a public Spotify playlist link to share it.</p>
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
@@ -127,39 +192,21 @@ export default function AdminPanel() {
                   className="w-full bg-[#111] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-orange-500/50 transition-colors"
                 />
                 <p className="text-white/20 text-xs mt-1.5 leading-relaxed">
-                  Paste a public <code className="text-white/35">open.spotify.com</code> playlist link, or a{" "}
-                  <code className="text-white/35">spotify:playlist:...</code> URI. Short{" "}
-                  <code className="text-white/35">spotify.link</code> URLs need to be opened in Spotify and copied as the full link.
+                  Paste a public <code className="text-white/35">open.spotify.com</code> playlist link or a{" "}
+                  <code className="text-white/35">spotify:playlist:...</code> URI.
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-white/60 mb-1.5">Curator Name</label>
-                  <input
-                    type="text"
-                    value={curatorName}
-                    onChange={(e) => setCuratorName(e.target.value)}
-                    placeholder="Your name"
-                    required
-                    className="w-full bg-[#111] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-orange-500/50 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-white/60 mb-1.5">Admin PIN</label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    placeholder="6-digit PIN"
-                    required
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    className="w-full bg-[#111] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-orange-500/50 transition-colors"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1.5">Curator Name</label>
+                <input
+                  type="text"
+                  value={curatorName}
+                  onChange={(e) => setCuratorName(e.target.value)}
+                  placeholder="Your name"
+                  required
+                  className="w-full bg-[#111] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-orange-500/50 transition-colors"
+                />
               </div>
 
               {error && (
@@ -193,7 +240,7 @@ export default function AdminPanel() {
             </form>
           </div>
 
-          {/* Right — Spotify status */}
+          {/* Spotify status */}
           <SpotifyStatus />
         </div>
 
