@@ -3,11 +3,7 @@ import { findById, removePlaylist } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_PIN = "pulse2025";
-
-function getAdminPin() {
-  return process.env.ADMIN_PIN ?? DEFAULT_PIN;
-}
+const ADMIN_PIN = "pulse2025";
 
 export async function DELETE(
   req: NextRequest,
@@ -22,7 +18,7 @@ export async function DELETE(
     // ignore parse errors
   }
 
-  if (!body.pin || body.pin !== getAdminPin()) {
+  if (!body.pin || body.pin !== ADMIN_PIN) {
     return NextResponse.json({ message: "Incorrect admin PIN." }, { status: 403 });
   }
 

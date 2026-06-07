@@ -4,11 +4,7 @@ import { addPlaylist, getPlaylists, playlistExists } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_PIN = "pulse2025";
-
-function getAdminPin() {
-  return process.env.ADMIN_PIN ?? DEFAULT_PIN;
-}
+const ADMIN_PIN = "pulse2025";
 
 function extractPlaylistId(input: string): string | null {
   try {
@@ -43,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const { spotifyUrl = "", curatorName = "", pin = "" } = body;
 
-  if (!pin.trim() || pin.trim() !== getAdminPin()) {
+  if (!pin.trim() || pin.trim() !== ADMIN_PIN) {
     return NextResponse.json({ message: "Incorrect admin PIN." }, { status: 403 });
   }
   if (!spotifyUrl.trim()) {
