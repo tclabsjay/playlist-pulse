@@ -8,8 +8,10 @@ const parentModule = require("../route") as { store?: StoredPlaylist[] };
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
+
   let body: { pin?: string };
   try {
     body = await req.json();
@@ -27,7 +29,7 @@ export async function DELETE(
     return NextResponse.json({ message: "Storage unavailable." }, { status: 500 });
   }
 
-  const idx = store.findIndex((p) => p.id === params.id);
+  const idx = store.findIndex((p) => p.id === id);
   if (idx === -1) {
     return NextResponse.json({ message: "Playlist not found." }, { status: 404 });
   }

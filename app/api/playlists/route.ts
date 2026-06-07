@@ -34,7 +34,7 @@ function extractPlaylistId(input: string): string | null {
 }
 
 export async function GET() {
-  const playlists = store.map(({ pinHash: _ph, ...p }) => p);
+  const playlists = store.map(({ pinHash: _, ...p }) => p);
   return NextResponse.json(playlists);
 }
 
@@ -124,6 +124,6 @@ export async function POST(req: NextRequest) {
 
   store.unshift(entry);
 
-  const { pinHash: _ph, ...publicEntry } = entry;
+  const { pinHash: _, ...publicEntry } = entry;
   return NextResponse.json(publicEntry, { status: 201 });
 }
