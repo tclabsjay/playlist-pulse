@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { getPlaylist, SpotifyError } from "@/lib/spotify";
+import { addPlaylist, getPlaylists, playlistExists } from "@/lib/storage";
 
-export interface StoredPlaylist {
-  id: string;
-  spotifyUrl: string;
-  name: string;
-  description: string;
-  imageUrl: string;
-  trackCount: number;
-  curatorName: string;
-  pinHash: string;
-  addedAt: string;
-}
-
-// Module-level store — persists within a single Lambda instance.
-// For cross-request persistence on Vercel, connect Vercel KV and
-// replace the array operations with kv.get/kv.set calls.
-const store: StoredPlaylist[] = [];
+export const dynamic = "force-dynamic";
 
 function extractPlaylistId(input: string): string | null {
   try {
@@ -27,15 +13,19 @@ function extractPlaylistId(input: string): string | null {
       return m?.[1] ?? null;
     }
   } catch {
-    // not a URL
+    // not a URL — try URI
   }
-  const m = input.match(/spotify:playlist:([a-zA-Z0-9]+)/);
-  return m?.[1] ?? null;
+  return input.match(/spotify:playlist:([a-zA-Z0-9]+)/)?.[1] ?? null;
 }
 
 export async function GET() {
-  const playlists = store.map(({ pinHash: _, ...p }) => p);
-  return NextResponse.json(playlists);
+  try {
+    const playlists = await getPlaylists();
+    return NextResponse.json(playlists);
+  } catch (e) {
+    console.error("[GET /api/playlists]", e);
+    return NextResponse.json({ message: "Failed to load playlists." }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -43,18 +33,24 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ message: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { spotifyUrl, curatorName, pin } = body;
+  const { spotifyUrl = "", curatorName = "", pin = "" } = body;
 
-  if (!spotifyUrl || !curatorName || !pin) {
-    return NextResponse.json({ message: "Spotify URL, curator name, and PIN are all required." }, { status: 400 });
+  if (!spotifyUrl.trim()) {
+    return NextResponse.json({ message: "Spotify URL is required." }, { status: 400 });
+  }
+  if (!curatorName.trim()) {
+    return NextResponse.json({ message: "Curator name is required." }, { status: 400 });
+  }
+  if (!pin.trim()) {
+    return NextResponse.json({ message: "Admin PIN is required." }, { status: 400 });
   }
 
   if (spotifyUrl.includes("spotify.link")) {
     return NextResponse.json(
-      { message: "Short spotify.link URLs are not supported. Open the link in Spotify, then share it to get the full open.spotify.com URL." },
+      { message: "Short spotify.link URLs are not supported. Open it in Spotify, tap ··· → Share → Copy link to get the full URL." },
       { status: 400 }
     );
   }
@@ -67,7 +63,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (store.some((p) => p.id === playlistId)) {
+  if (await playlistExists(playlistId)) {
     return NextResponse.json({ message: "This playlist has already been added." }, { status: 409 });
   }
 
@@ -78,13 +74,13 @@ export async function POST(req: NextRequest) {
     if (err instanceof SpotifyError) {
       if (err.status === 401) {
         return NextResponse.json(
-          { message: "Spotify credentials are invalid. Double-check SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel → Project Settings → Environment Variables, then redeploy." },
+          { message: "Spotify credentials are invalid. Check SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel → Settings → Environment Variables, then redeploy." },
           { status: 500 }
         );
       }
       if (err.status === 404) {
         return NextResponse.json(
-          { message: "Playlist not found. Make sure it is set to Public in Spotify." },
+          { message: "Playlist not found. Make sure the playlist is set to Public in Spotify." },
           { status: 404 }
         );
       }
@@ -95,34 +91,39 @@ export async function POST(req: NextRequest) {
         );
       }
       return NextResponse.json(
-        { message: `Spotify error ${err.status}: ${err.message}` },
-        { status: 500 }
+        { message: `Spotify returned an error (${err.status}). The playlist may be unavailable.` },
+        { status: 502 }
       );
     }
     if (err instanceof Error && err.message.includes("configured")) {
       return NextResponse.json(
-        { message: "Spotify API credentials are missing. Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel → Project Settings → Environment Variables." },
+        { message: "Spotify credentials are not set. Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel → Settings → Environment Variables." },
         { status: 500 }
       );
     }
     const detail = err instanceof Error ? err.message : String(err);
-    console.error("[playlists POST] Unexpected error:", detail);
-    return NextResponse.json({ message: `Save failed: ${detail}` }, { status: 500 });
+    console.error("[POST /api/playlists] Unexpected error:", detail);
+    return NextResponse.json({ message: `Unexpected error: ${detail}` }, { status: 500 });
   }
 
-  const entry: StoredPlaylist = {
+  const entry = {
     id: spotifyData.id,
-    spotifyUrl,
+    spotifyUrl: spotifyUrl.trim(),
     name: spotifyData.name,
-    description: spotifyData.description?.replace(/<[^>]*>/g, "") ?? "",
+    description: (spotifyData.description ?? "").replace(/<[^>]*>/g, ""),
     imageUrl: spotifyData.images?.[0]?.url ?? "",
     trackCount: spotifyData.tracks.total,
     curatorName: curatorName.trim(),
-    pinHash: createHash("sha256").update(pin).digest("hex"),
+    pinHash: createHash("sha256").update(pin.trim()).digest("hex"),
     addedAt: new Date().toISOString(),
   };
 
-  store.unshift(entry);
+  try {
+    await addPlaylist(entry);
+  } catch (e) {
+    console.error("[POST /api/playlists] Storage error:", e);
+    return NextResponse.json({ message: "Playlist validated but could not be saved. Storage may not be configured." }, { status: 500 });
+  }
 
   const { pinHash: _, ...publicEntry } = entry;
   return NextResponse.json(publicEntry, { status: 201 });
