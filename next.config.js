@@ -1,8 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  eslint: {
+    // Lint runs in CI separately; don't let it block production builds
+    ignoreDuringBuilds: true,
+  },
   images: {
     remotePatterns: [
-      // Covers all Spotify CDN hostnames (i.scdn.co, mosaic.scdn.co, etc.)
       { protocol: 'https', hostname: '*.scdn.co' },
       { protocol: 'https', hostname: '*.spotifycdn.com' },
     ],
