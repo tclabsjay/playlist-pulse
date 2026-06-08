@@ -65,7 +65,7 @@ export default function SpotifyStatus() {
         <button
           onClick={refresh}
           disabled={loading}
-          className="text-white/30 hover:text-white/60 transition-colors disabled:opacity-40"
+          className="text-white/30 hover:text-white/60 active:text-white/80 transition-colors disabled:opacity-40 p-2.5 -mr-2.5"
           title="Refresh"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={loading ? "animate-spin" : ""}>

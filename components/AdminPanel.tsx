@@ -159,9 +159,9 @@ export default function AdminPanel() {
             </svg>
             Return to Public View
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <span className="text-xs text-orange-400 font-medium bg-orange-400/10 px-2.5 py-1 rounded-full">Admin Access</span>
-            <button onClick={() => setUnlocked(false)} className="text-white/20 hover:text-white/50 text-xs transition-colors" title="Lock">
+            <button onClick={() => setUnlocked(false)} className="text-white/20 hover:text-white/50 active:text-white/70 transition-colors p-2.5" title="Lock">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
@@ -291,7 +291,7 @@ export default function AdminPanel() {
                     <p className="text-white/35 text-xs mt-0.5">{p.trackCount} tracks · Curated by {p.curatorName}</p>
                   </div>
                   <button onClick={() => handleDelete(p.id)}
-                    className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400 transition-all self-start pt-0.5"
+                    className="text-white/30 hover:text-red-400 active:text-red-500 transition-colors self-start p-1.5 -mr-1.5 sm:opacity-0 sm:group-hover:opacity-100"
                     title="Remove">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M18 6 6 18M6 6l12 12" />

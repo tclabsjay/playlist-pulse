@@ -33,7 +33,7 @@ export default async function HomePage() {
         <h1 className="text-2xl font-bold mb-1">Public Listening Room</h1>
         <p className="text-white/40 text-sm mb-8">
           {playlists.length > 0
-            ? `${playlists.length} curated playlist${playlists.length === 1 ? "" : "s"} — click to view tracks.`
+            ? `${playlists.length} curated playlist${playlists.length === 1 ? "" : "s"} — open any to browse tracks.`
             : "No playlists added yet."}
         </p>
 
