@@ -122,14 +122,15 @@ export async function getPlaylistData(id: string): Promise<{
 }> {
   type Full = SpotifyPlaylist & {
     followers: { total: number };
-    tracks: { items: { track: SpotifyTrack | null }[]; total: number; next: string | null };
+    tracks: { items: { track: SpotifyTrack | null; is_local: boolean }[]; total: number; next: string | null };
   };
 
   const data = await spotifyFetch<Full>(`/playlists/${id}`, 300, true);
 
   const tracks = data.tracks.items
+    .filter((item) => !item.is_local)
     .map((item) => item.track)
-    .filter((t): t is SpotifyTrack => t !== null && !!(t as unknown as { is_local?: boolean }).is_local === false && !!t.id);
+    .filter((t): t is SpotifyTrack => t !== null && !!t.id);
 
   return {
     name: data.name,
