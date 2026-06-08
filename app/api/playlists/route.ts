@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
       name: spotifyData.name,
       description: (spotifyData.description ?? "").replace(/<[^>]*>/g, ""),
       imageUrl: spotifyData.images?.[0]?.url ?? "",
-      trackCount: spotifyData.tracks?.total ?? 0,
+      trackCount: spotifyData.items?.total ?? spotifyData.tracks?.total ?? 0,
       curatorName: curatorName.trim(),
       addedAt: new Date().toISOString(),
     };

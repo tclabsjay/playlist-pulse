@@ -12,7 +12,8 @@ export interface SpotifyPlaylist {
   name: string;
   description: string;
   images: SpotifyImage[];
-  tracks: { total: number };
+  tracks?: { total: number };  // field name before Feb 2026
+  items?: { total: number };   // renamed from tracks in Feb 2026
   owner: { display_name: string };
   external_urls: { spotify: string };
   followers?: { total: number };
@@ -29,11 +30,6 @@ export interface SpotifyTrack {
   preview_url: string | null;
 }
 
-export interface SpotifyCategory {
-  id: string;
-  name: string;
-  icons: SpotifyImage[];
-}
 
 export class SpotifyError extends Error {
   constructor(public status: number, message: string) {
@@ -82,31 +78,16 @@ async function spotifyFetch<T>(path: string, revalidate = 300, noStore = false):
   return res.json() as Promise<T>;
 }
 
-export async function getCategories(): Promise<SpotifyCategory[]> {
-  const data = await spotifyFetch<{ categories: { items: SpotifyCategory[] } }>(
-    "/browse/categories?limit=12&country=US",
-    86400
-  );
-  return data.categories.items;
-}
-
-export async function getCategoryPlaylists(categoryId: string): Promise<SpotifyPlaylist[]> {
-  const data = await spotifyFetch<{ playlists: { items: SpotifyPlaylist[] } }>(
-    `/browse/categories/${categoryId}/playlists?limit=20&country=US`,
-    3600
-  );
-  return data.playlists.items.filter(Boolean);
-}
-
 export async function searchPlaylists(query: string): Promise<SpotifyPlaylist[]> {
+  // limit capped at 10 per Feb 2026 Spotify API change (was 50)
   const data = await spotifyFetch<{ playlists: { items: SpotifyPlaylist[] } }>(
-    `/search?q=${encodeURIComponent(query)}&type=playlist&limit=20`,
+    `/search?q=${encodeURIComponent(query)}&type=playlist&limit=10`,
     60
   );
   return data.playlists.items.filter(Boolean);
 }
 
-export async function getPlaylist(id: string): Promise<SpotifyPlaylist & { tracks: { items: { track: SpotifyTrack }[]; total: number } }> {
+export async function getPlaylist(id: string): Promise<SpotifyPlaylist> {
   return spotifyFetch(`/playlists/${id}`, 300);
 }
 
@@ -212,8 +193,8 @@ export async function getPlaylistDataAsUser(id: string, accessToken: string): Pr
   return { ...meta, tracks: [], trackTotal: 0, tracksRestricted: true };
 }
 
-// Fetches playlist metadata + inline tracks (first 100) with no cache.
-// Uses /playlists/{id} because /playlists/{id}/tracks 403s with client credentials.
+// Fetches playlist metadata + inline tracks (first 100) with no cache using client credentials.
+// Handles Feb 2026 field renames: tracks→items (paging object), track→item (each entry).
 export async function getPlaylistData(id: string): Promise<{
   name: string;
   description: string;
@@ -223,29 +204,28 @@ export async function getPlaylistData(id: string): Promise<{
   tracks: SpotifyTrack[];
   tracksRestricted: boolean;
 }> {
-  type Full = SpotifyPlaylist & {
-    followers: { total: number };
-    tracks: { items: { track: SpotifyTrack | null; is_local: boolean }[]; total: number; next: string | null };
-  };
+  type PagingItem = { track?: SpotifyTrack | null; item?: SpotifyTrack | null; is_local: boolean };
+  type PagingObject = { items?: PagingItem[]; total?: number; next?: string | null };
+  type Full = SpotifyPlaylist & { followers?: { total: number }; tracks?: PagingObject; items?: PagingObject };
 
   const data = await spotifyFetch<Full>(`/playlists/${id}`, 300, true);
 
-  // Spotify's client-credentials token does not return tracks.items for some playlists.
-  // Detect this so the UI can show an informative message instead of "no tracks".
-  const tracksRestricted = data.tracks?.items === undefined;
+  // Handle both old (tracks) and new (items) field names per Feb 2026 rename
+  const pagingObj = data.items ?? data.tracks;
+  const tracksRestricted = !pagingObj?.items;
 
-  const items = data.tracks?.items ?? [];
-  const tracks = items
-    .filter((item) => !item.is_local)
-    .map((item) => item.track)
-    .filter((t): t is SpotifyTrack => t !== null && !!t.id);
+  const rawItems = pagingObj?.items ?? [];
+  const tracks = rawItems
+    .filter((i) => !i.is_local)
+    .map((i) => i.item ?? i.track)
+    .filter((t): t is SpotifyTrack => t !== null && t !== undefined && !!t.id);
 
   return {
     name: data.name,
     description: (data.description ?? "").replace(/<[^>]*>/g, ""),
     imageUrl: data.images?.[0]?.url ?? "",
     followers: data.followers?.total ?? null,
-    trackTotal: data.tracks?.total ?? 0,
+    trackTotal: pagingObj?.total ?? 0,
     tracks,
     tracksRestricted,
   };
