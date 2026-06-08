@@ -119,6 +119,7 @@ export async function getPlaylistData(id: string): Promise<{
   followers: number | null;
   trackTotal: number;
   tracks: SpotifyTrack[];
+  tracksRestricted: boolean;
 }> {
   type Full = SpotifyPlaylist & {
     followers: { total: number };
@@ -127,9 +128,9 @@ export async function getPlaylistData(id: string): Promise<{
 
   const data = await spotifyFetch<Full>(`/playlists/${id}`, 300, true);
 
-  if (!data.tracks?.items) {
-    console.error(`[getPlaylistData] tracks.items missing for ${id}:`, JSON.stringify({ tracks: data.tracks, keys: Object.keys(data) }));
-  }
+  // Spotify's client-credentials token does not return tracks.items for some playlists.
+  // Detect this so the UI can show an informative message instead of "no tracks".
+  const tracksRestricted = data.tracks?.items === undefined;
 
   const items = data.tracks?.items ?? [];
   const tracks = items
@@ -144,5 +145,6 @@ export async function getPlaylistData(id: string): Promise<{
     followers: data.followers?.total ?? null,
     trackTotal: data.tracks?.total ?? 0,
     tracks,
+    tracksRestricted,
   };
 }
