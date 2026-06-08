@@ -47,8 +47,7 @@ jobs:
               -e production \
               -e preview \
               -e development \
-              --token="$VERCEL_TOKEN" \
-              --yes; then
+              --token="$VERCEL_TOKEN"; then
               echo "✓ Upstash Redis provisioned — pulling updated env vars"
               vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
             else
