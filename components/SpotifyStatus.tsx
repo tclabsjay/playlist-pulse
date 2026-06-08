@@ -126,8 +126,8 @@ export default function SpotifyStatus() {
               label="Persistent storage"
               sub={
                 status?.kvConfigured
-                  ? "Vercel KV connected — playlists persist across deploys."
-                  : "No KV store detected. Playlists reset on server restart. Add Vercel KV in dashboard → Storage."
+                  ? "Upstash Redis connected — playlists persist across deploys."
+                  : "Not configured. Go to vercel.com/dashboard → Storage → Connect Store → Upstash Redis, then redeploy."
               }
             />
           </div>

@@ -35,25 +35,13 @@ jobs:
       - name: Pull Vercel environment & config
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
 
-      - name: Provision Upstash Redis if not yet configured
+      - name: Check persistent storage
         run: |
           if grep -q "KV_REST_API_URL" .vercel/.env.production.local 2>/dev/null; then
-            echo "✓ Upstash Redis already configured — skipping provisioning"
+            echo "✓ Upstash Redis configured — playlists will persist"
           else
-            echo "No KV storage detected. Provisioning Upstash Redis free tier..."
-            if printf 'y\ny\ny\n' | timeout 90 vercel install upstash-kv \
-              --name "playlist-pulse-redis" \
-              --plan free \
-              -e production \
-              -e preview \
-              -e development \
-              --token="$VERCEL_TOKEN"; then
-              echo "✓ Upstash Redis provisioned — pulling updated env vars"
-              vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-            else
-              echo "⚠ Auto-provisioning failed. Playlists will reset on cold start."
-              echo "  → Install Upstash Redis manually: vercel.com/marketplace/upstash/upstash-kv"
-            fi
+            echo "ℹ No KV storage configured. Playlists reset on cold start."
+            echo "  → Add Upstash Redis: vercel.com/dashboard → Storage → Connect Store → Upstash Redis"
           fi
 
       - name: Build
