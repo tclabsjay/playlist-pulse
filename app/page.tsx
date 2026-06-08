@@ -33,18 +33,16 @@ export default async function HomePage() {
         <h1 className="text-2xl font-bold mb-1">Public Listening Room</h1>
         <p className="text-white/40 text-sm mb-8">
           {playlists.length > 0
-            ? `${playlists.length} curated playlist${playlists.length === 1 ? "" : "s"} — click to open in Spotify.`
+            ? `${playlists.length} curated playlist${playlists.length === 1 ? "" : "s"} — click to view tracks.`
             : "No playlists added yet."}
         </p>
 
         {playlists.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {playlists.map((p) => (
-              <a
+              <Link
                 key={p.id}
-                href={p.spotifyUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`/playlist/${p.id}`}
                 className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-5 flex flex-col gap-3 hover:border-white/15 hover:bg-[#1f1f1f] transition-all group"
               >
                 {p.imageUrl ? (
@@ -72,7 +70,7 @@ export default async function HomePage() {
                     {p.trackCount} tracks · by {p.curatorName}
                   </p>
                 </div>
-              </a>
+              </Link>
             ))}
           </div>
         ) : (

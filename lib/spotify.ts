@@ -109,3 +109,25 @@ export async function searchPlaylists(query: string): Promise<SpotifyPlaylist[]>
 export async function getPlaylist(id: string): Promise<SpotifyPlaylist & { tracks: { items: { track: SpotifyTrack }[]; total: number } }> {
   return spotifyFetch(`/playlists/${id}`, 300);
 }
+
+export async function getPlaylistTracks(id: string): Promise<SpotifyTrack[]> {
+  const tracks: SpotifyTrack[] = [];
+  let offset = 0;
+  const limit = 100;
+
+  while (offset < 500) {
+    const data = await spotifyFetch<{
+      items: { track: SpotifyTrack | null }[];
+      next: string | null;
+    }>(`/playlists/${id}/tracks?limit=${limit}&offset=${offset}`, 300);
+
+    for (const item of data.items) {
+      if (item.track) tracks.push(item.track);
+    }
+
+    if (!data.next) break;
+    offset += limit;
+  }
+
+  return tracks;
+}
