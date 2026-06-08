@@ -1,5 +1,5 @@
 import { getPlaylists, updateTrackCount } from "@/lib/storage";
-import { getPlaylistFresh, getPlaylistTracks, SpotifyTrack } from "@/lib/spotify";
+import { getPlaylistData, SpotifyTrack } from "@/lib/spotify";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -22,32 +22,17 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
   let credentialsMissing = false;
   let fetchError: string | null = null;
 
-  const [metaResult, tracksResult] = await Promise.allSettled([
-    getPlaylistFresh(stored.id),
-    getPlaylistTracks(stored.id),
-  ]);
-
-  if (tracksResult.status === "fulfilled") {
-    tracks = tracksResult.value;
-  }
-
-  if (metaResult.status === "fulfilled") {
-    followers = metaResult.value.followers?.total ?? null;
-    const freshTotal = metaResult.value.tracks?.total ?? 0;
-    if (freshTotal !== stored.trackCount) {
-      updateTrackCount(stored.id, freshTotal).catch(() => {});
+  try {
+    const data = await getPlaylistData(stored.id);
+    tracks = data.tracks;
+    followers = data.followers;
+    if (data.trackTotal !== stored.trackCount) {
+      updateTrackCount(stored.id, data.trackTotal).catch(() => {});
     }
-  }
-
-  // Determine error state from the tracks fetch (the critical one)
-  if (tracksResult.status === "rejected") {
-    const err = tracksResult.reason;
+  } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    const status = (err as { status?: number })?.status;
     if (msg.includes("credentials") || msg.includes("not configured")) {
       credentialsMissing = true;
-    } else if (status === 403 || status === 404) {
-      fetchError = "This playlist is private or unavailable. In Spotify, open the playlist → ··· → Make public, then refresh.";
     } else {
       fetchError = msg || "Could not load tracks from Spotify.";
     }

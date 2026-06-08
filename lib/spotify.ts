@@ -110,28 +110,33 @@ export async function getPlaylist(id: string): Promise<SpotifyPlaylist & { track
   return spotifyFetch(`/playlists/${id}`, 300);
 }
 
-export async function getPlaylistFresh(id: string): Promise<SpotifyPlaylist & { tracks: { total: number } }> {
-  return spotifyFetch(`/playlists/${id}`, 300, true);
-}
+// Fetches playlist metadata + inline tracks (first 100) with no cache.
+// Uses /playlists/{id} because /playlists/{id}/tracks 403s with client credentials.
+export async function getPlaylistData(id: string): Promise<{
+  name: string;
+  description: string;
+  imageUrl: string;
+  followers: number | null;
+  trackTotal: number;
+  tracks: SpotifyTrack[];
+}> {
+  type Full = SpotifyPlaylist & {
+    followers: { total: number };
+    tracks: { items: { track: SpotifyTrack | null }[]; total: number; next: string | null };
+  };
 
-export async function getPlaylistTracks(id: string): Promise<SpotifyTrack[]> {
-  const tracks: SpotifyTrack[] = [];
-  let offset = 0;
-  const limit = 100;
+  const data = await spotifyFetch<Full>(`/playlists/${id}`, 300, true);
 
-  while (offset < 500) {
-    const data = await spotifyFetch<{
-      items: { track: SpotifyTrack | null }[];
-      next: string | null;
-    }>(`/playlists/${id}/tracks?limit=${limit}&offset=${offset}`, 300, true);
+  const tracks = data.tracks.items
+    .map((item) => item.track)
+    .filter((t): t is SpotifyTrack => t !== null && !!(t as unknown as { is_local?: boolean }).is_local === false && !!t.id);
 
-    for (const item of data.items) {
-      if (item.track) tracks.push(item.track);
-    }
-
-    if (!data.next) break;
-    offset += limit;
-  }
-
-  return tracks;
+  return {
+    name: data.name,
+    description: (data.description ?? "").replace(/<[^>]*>/g, ""),
+    imageUrl: data.images?.[0]?.url ?? "",
+    followers: data.followers?.total ?? null,
+    trackTotal: data.tracks.total,
+    tracks,
+  };
 }
