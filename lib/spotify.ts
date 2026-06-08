@@ -111,7 +111,7 @@ export async function getPlaylist(id: string): Promise<SpotifyPlaylist & { track
 }
 
 export async function getPlaylistFresh(id: string): Promise<SpotifyPlaylist & { tracks: { total: number } }> {
-  return spotifyFetch(`/playlists/${id}?fields=id,name,description,images,tracks.total,owner,external_urls,followers`, 300, true);
+  return spotifyFetch(`/playlists/${id}`, 300, true);
 }
 
 export async function getPlaylistTracks(id: string): Promise<SpotifyTrack[]> {

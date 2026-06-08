@@ -22,19 +22,26 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
   let credentialsMissing = false;
   let fetchError: string | null = null;
 
-  try {
-    const [meta, fetchedTracks] = await Promise.all([
-      getPlaylistFresh(stored.id),
-      getPlaylistTracks(stored.id),
-    ]);
-    followers = meta.followers?.total ?? null;
-    tracks = fetchedTracks;
-    // Keep stored count in sync so the home card stays accurate
-    if (meta.tracks.total !== stored.trackCount) {
-      updateTrackCount(stored.id, meta.tracks.total).catch(() => {});
+  const [metaResult, tracksResult] = await Promise.allSettled([
+    getPlaylistFresh(stored.id),
+    getPlaylistTracks(stored.id),
+  ]);
+
+  if (tracksResult.status === "fulfilled") {
+    tracks = tracksResult.value;
+  }
+
+  if (metaResult.status === "fulfilled") {
+    followers = metaResult.value.followers?.total ?? null;
+    const freshTotal = metaResult.value.tracks?.total ?? 0;
+    if (freshTotal !== stored.trackCount) {
+      updateTrackCount(stored.id, freshTotal).catch(() => {});
     }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "";
+  }
+
+  // Determine error state from the tracks fetch (the critical one)
+  if (tracksResult.status === "rejected") {
+    const msg = tracksResult.reason instanceof Error ? tracksResult.reason.message : String(tracksResult.reason);
     if (msg.includes("credentials") || msg.includes("not configured")) {
       credentialsMissing = true;
     } else {
