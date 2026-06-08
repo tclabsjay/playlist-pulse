@@ -127,7 +127,12 @@ export async function getPlaylistData(id: string): Promise<{
 
   const data = await spotifyFetch<Full>(`/playlists/${id}`, 300, true);
 
-  const tracks = data.tracks.items
+  if (!data.tracks?.items) {
+    console.error(`[getPlaylistData] tracks.items missing for ${id}:`, JSON.stringify({ tracks: data.tracks, keys: Object.keys(data) }));
+  }
+
+  const items = data.tracks?.items ?? [];
+  const tracks = items
     .filter((item) => !item.is_local)
     .map((item) => item.track)
     .filter((t): t is SpotifyTrack => t !== null && !!t.id);
@@ -137,7 +142,7 @@ export async function getPlaylistData(id: string): Promise<{
     description: (data.description ?? "").replace(/<[^>]*>/g, ""),
     imageUrl: data.images?.[0]?.url ?? "",
     followers: data.followers?.total ?? null,
-    trackTotal: data.tracks.total,
+    trackTotal: data.tracks?.total ?? 0,
     tracks,
   };
 }
