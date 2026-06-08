@@ -68,11 +68,11 @@ async function getAccessToken(): Promise<string> {
   return data.access_token as string;
 }
 
-async function spotifyFetch<T>(path: string, revalidate = 300): Promise<T> {
+async function spotifyFetch<T>(path: string, revalidate = 300, noStore = false): Promise<T> {
   const token = await getAccessToken();
   const res = await fetch(`https://api.spotify.com/v1${path}`, {
     headers: { Authorization: `Bearer ${token}` },
-    next: { revalidate },
+    ...(noStore ? { cache: "no-store" as const } : { next: { revalidate } }),
   });
 
   if (!res.ok) {
@@ -110,6 +110,10 @@ export async function getPlaylist(id: string): Promise<SpotifyPlaylist & { track
   return spotifyFetch(`/playlists/${id}`, 300);
 }
 
+export async function getPlaylistFresh(id: string): Promise<SpotifyPlaylist & { tracks: { total: number } }> {
+  return spotifyFetch(`/playlists/${id}?fields=id,name,description,images,tracks.total,owner,external_urls,followers`, 300, true);
+}
+
 export async function getPlaylistTracks(id: string): Promise<SpotifyTrack[]> {
   const tracks: SpotifyTrack[] = [];
   let offset = 0;
@@ -119,7 +123,7 @@ export async function getPlaylistTracks(id: string): Promise<SpotifyTrack[]> {
     const data = await spotifyFetch<{
       items: { track: SpotifyTrack | null }[];
       next: string | null;
-    }>(`/playlists/${id}/tracks?limit=${limit}&offset=${offset}`, 300);
+    }>(`/playlists/${id}/tracks?limit=${limit}&offset=${offset}`, 300, true);
 
     for (const item of data.items) {
       if (item.track) tracks.push(item.track);

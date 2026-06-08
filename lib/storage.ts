@@ -78,6 +78,20 @@ export async function addPlaylist(entry: StoredPlaylist): Promise<void> {
   memStore.unshift(entry);
 }
 
+export async function updateTrackCount(id: string, trackCount: number): Promise<void> {
+  if (kvConfigured()) {
+    const playlists = await kvGetPlaylists();
+    const idx = playlists.findIndex((p) => p.id === id);
+    if (idx !== -1) {
+      playlists[idx] = { ...playlists[idx], trackCount };
+      await kvSetPlaylists(playlists);
+    }
+    return;
+  }
+  const p = memStore.find((p) => p.id === id);
+  if (p) p.trackCount = trackCount;
+}
+
 export async function removePlaylist(id: string): Promise<void> {
   if (kvConfigured()) {
     const playlists = await kvGetPlaylists();

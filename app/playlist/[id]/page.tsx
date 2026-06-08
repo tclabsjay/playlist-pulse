@@ -1,5 +1,5 @@
-import { getPlaylists } from "@/lib/storage";
-import { getPlaylist, getPlaylistTracks, SpotifyTrack } from "@/lib/spotify";
+import { getPlaylists, updateTrackCount } from "@/lib/storage";
+import { getPlaylistFresh, getPlaylistTracks, SpotifyTrack } from "@/lib/spotify";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -20,15 +20,25 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
   let tracks: SpotifyTrack[] = [];
   let followers: number | null = null;
   let credentialsMissing = false;
+  let fetchError: string | null = null;
 
   try {
-    const full = await getPlaylist(stored.id);
-    followers = full.followers?.total ?? null;
-    tracks = await getPlaylistTracks(stored.id);
+    const [meta, fetchedTracks] = await Promise.all([
+      getPlaylistFresh(stored.id),
+      getPlaylistTracks(stored.id),
+    ]);
+    followers = meta.followers?.total ?? null;
+    tracks = fetchedTracks;
+    // Keep stored count in sync so the home card stays accurate
+    if (meta.tracks.total !== stored.trackCount) {
+      updateTrackCount(stored.id, meta.tracks.total).catch(() => {});
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "";
     if (msg.includes("credentials") || msg.includes("not configured")) {
       credentialsMissing = true;
+    } else {
+      fetchError = msg || "Could not load tracks from Spotify.";
     }
   }
 
@@ -102,6 +112,10 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
             </svg>
             <p className="text-white/30 text-sm">Add Spotify API credentials to view tracks</p>
           </div>
+        ) : fetchError ? (
+          <div className="bg-red-500/5 border border-red-500/15 rounded-2xl py-12 text-center px-6">
+            <p className="text-red-400/70 text-sm">Could not load tracks — {fetchError}</p>
+          </div>
         ) : tracks.length > 0 ? (
           <div>
             {/* Column headers — desktop only */}
@@ -164,8 +178,12 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
             )}
           </div>
         ) : (
-          <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl py-16 text-center">
-            <p className="text-white/30 text-sm">No tracks found</p>
+          <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl py-16 text-center px-6">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-white/10 mx-auto mb-3">
+              <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+            </svg>
+            <p className="text-white/30 text-sm font-medium">No tracks in this playlist</p>
+            <p className="text-white/15 text-xs mt-1.5">Add songs to this playlist in Spotify, then come back.</p>
           </div>
         )}
       </main>
