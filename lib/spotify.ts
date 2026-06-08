@@ -110,6 +110,108 @@ export async function getPlaylist(id: string): Promise<SpotifyPlaylist & { track
   return spotifyFetch(`/playlists/${id}`, 300);
 }
 
+export async function exchangeCodeForTokens(code: string, redirectUri: string): Promise<{ refreshToken: string; displayName: string }> {
+  if (!CLIENT_ID || !CLIENT_SECRET) throw new Error("Spotify credentials are not configured.");
+  const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: `Basic ${credentials}` },
+    body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri }).toString(),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new SpotifyError(res.status, `Token exchange failed (${res.status})`);
+  const tokens = await res.json();
+  const accessToken = tokens.access_token as string;
+  const refreshToken = tokens.refresh_token as string;
+
+  // Fetch display name
+  const meRes = await fetch("https://api.spotify.com/v1/me", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+  let displayName = "Spotify User";
+  if (meRes.ok) {
+    const me = await meRes.json();
+    displayName = (me.display_name || me.id || "Spotify User") as string;
+  }
+  return { refreshToken, displayName };
+}
+
+export async function refreshUserToken(refreshToken: string): Promise<string> {
+  if (!CLIENT_ID || !CLIENT_SECRET) throw new Error("Spotify credentials are not configured.");
+  const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: `Basic ${credentials}` },
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }).toString(),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new SpotifyError(res.status, "Failed to refresh user token");
+  const data = await res.json();
+  return data.access_token as string;
+}
+
+// Fetches playlist data using a user OAuth access token.
+// Handles Feb 2026 field renames: tracks→items (paging object), track→item (each entry).
+// Tries inline items from GET /playlists/{id}, then falls back to GET /playlists/{id}/items.
+export async function getPlaylistDataAsUser(id: string, accessToken: string): Promise<{
+  name: string;
+  description: string;
+  imageUrl: string;
+  followers: number | null;
+  trackTotal: number;
+  tracks: SpotifyTrack[];
+  tracksRestricted: boolean;
+}> {
+  const res = await fetch(`https://api.spotify.com/v1/playlists/${id}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new SpotifyError(res.status, `Spotify returned ${res.status} for playlist ${id}`);
+  const data = await res.json() as Record<string, unknown>;
+
+  type RawItem = { track?: SpotifyTrack | null; item?: SpotifyTrack | null; is_local?: boolean };
+  type PagingObj = { items?: RawItem[]; total?: number };
+
+  // Handle both old field name (tracks) and new (items) in the playlist object
+  const pagingObj = (data.items ?? data.tracks) as PagingObj | undefined;
+
+  const extractTracks = (items: RawItem[]): SpotifyTrack[] =>
+    items
+      .filter((i) => !i.is_local)
+      .map((i) => (i.item ?? i.track) as SpotifyTrack | null)
+      .filter((t): t is SpotifyTrack => t !== null && !!t.id);
+
+  const images = data.images as SpotifyImage[];
+  const followersObj = data.followers as { total: number } | undefined;
+  const meta = {
+    name: data.name as string,
+    description: ((data.description as string) ?? "").replace(/<[^>]*>/g, ""),
+    imageUrl: images?.[0]?.url ?? "",
+    followers: followersObj?.total ?? null,
+  };
+
+  if (pagingObj?.items) {
+    const tracks = extractTracks(pagingObj.items);
+    return { ...meta, tracks, trackTotal: pagingObj.total ?? tracks.length, tracksRestricted: false };
+  }
+
+  // Inline items missing — try the renamed /items endpoint (was /tracks before Feb 2026)
+  const itemsRes = await fetch(`https://api.spotify.com/v1/playlists/${id}/items?limit=100`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+  if (itemsRes.ok) {
+    const itemsData = await itemsRes.json() as PagingObj;
+    if (itemsData.items) {
+      const tracks = extractTracks(itemsData.items);
+      return { ...meta, tracks, trackTotal: itemsData.total ?? tracks.length, tracksRestricted: false };
+    }
+  }
+
+  return { ...meta, tracks: [], trackTotal: 0, tracksRestricted: true };
+}
+
 // Fetches playlist metadata + inline tracks (first 100) with no cache.
 // Uses /playlists/{id} because /playlists/{id}/tracks 403s with client credentials.
 export async function getPlaylistData(id: string): Promise<{

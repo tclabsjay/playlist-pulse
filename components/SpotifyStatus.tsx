@@ -35,6 +35,9 @@ function Check({ ok, label, sub }: { ok: boolean; label: string; sub: string }) 
 export default function SpotifyStatus() {
   const [status, setStatus] = useState<Status | null>(null);
   const [loading, setLoading] = useState(true);
+  const [account, setAccount] = useState<{ connected: boolean; displayName: string | null } | null>(null);
+  const [accountLoading, setAccountLoading] = useState(true);
+  const [redirectUri, setRedirectUri] = useState("");
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -46,7 +49,26 @@ export default function SpotifyStatus() {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  const refreshAccount = useCallback(async () => {
+    setAccountLoading(true);
+    try {
+      const res = await fetch("/api/auth/spotify/status");
+      if (res.ok) setAccount(await res.json());
+    } finally {
+      setAccountLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    refreshAccount();
+    setRedirectUri(window.location.origin + "/api/auth/spotify/callback");
+  }, [refresh, refreshAccount]);
+
+  const disconnect = async () => {
+    await fetch("/api/auth/spotify/disconnect", { method: "POST" });
+    await refreshAccount();
+  };
 
   const connected = status?.hasCredentials && status?.apiWorks;
   const checkedTime = status?.checkedAt

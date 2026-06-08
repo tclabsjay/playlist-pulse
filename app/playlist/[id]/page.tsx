@@ -1,5 +1,5 @@
-import { getPlaylists, updateTrackCount } from "@/lib/storage";
-import { getPlaylistData, SpotifyTrack } from "@/lib/spotify";
+import { getPlaylists, updateTrackCount, getSpotifyRefreshToken } from "@/lib/storage";
+import { getPlaylistData, getPlaylistDataAsUser, refreshUserToken, SpotifyTrack } from "@/lib/spotify";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -24,7 +24,18 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
   let tracksRestricted = false;
 
   try {
-    const data = await getPlaylistData(stored.id);
+    const refreshToken = await getSpotifyRefreshToken();
+    let data;
+    if (refreshToken) {
+      try {
+        const accessToken = await refreshUserToken(refreshToken);
+        data = await getPlaylistDataAsUser(stored.id, accessToken);
+      } catch {
+        data = await getPlaylistData(stored.id);
+      }
+    } else {
+      data = await getPlaylistData(stored.id);
+    }
     tracks = data.tracks;
     followers = data.followers;
     tracksRestricted = data.tracksRestricted;

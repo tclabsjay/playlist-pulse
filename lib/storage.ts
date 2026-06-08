@@ -101,3 +101,35 @@ export async function removePlaylist(id: string): Promise<void> {
   const i = memStore.findIndex((p) => p.id === id);
   if (i !== -1) memStore.splice(i, 1);
 }
+
+// Internal generic KV helpers
+async function kvGet(key: string): Promise<string | null> {
+  const raw = await kvExec(["GET", key]);
+  return typeof raw === "string" ? raw : null;
+}
+async function kvSet(key: string, value: string): Promise<void> {
+  await kvExec(["SET", key, value]);
+}
+async function kvDel(key: string): Promise<void> {
+  await kvExec(["DEL", key]);
+}
+
+const SPOTIFY_TOKEN_KEY = "spotify_refresh_token";
+const SPOTIFY_NAME_KEY = "spotify_user_display_name";
+
+export async function getSpotifyRefreshToken(): Promise<string | null> {
+  if (!kvConfigured()) return null;
+  return kvGet(SPOTIFY_TOKEN_KEY);
+}
+export async function getSpotifyUserName(): Promise<string | null> {
+  if (!kvConfigured()) return null;
+  return kvGet(SPOTIFY_NAME_KEY);
+}
+export async function setSpotifyToken(refreshToken: string, displayName: string): Promise<void> {
+  if (!kvConfigured()) throw new Error("KV storage is not configured — set up Upstash Redis first.");
+  await Promise.all([kvSet(SPOTIFY_TOKEN_KEY, refreshToken), kvSet(SPOTIFY_NAME_KEY, displayName)]);
+}
+export async function clearSpotifyToken(): Promise<void> {
+  if (!kvConfigured()) return;
+  await Promise.all([kvDel(SPOTIFY_TOKEN_KEY), kvDel(SPOTIFY_NAME_KEY)]);
+}
