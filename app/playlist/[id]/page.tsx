@@ -41,9 +41,13 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
 
   // Determine error state from the tracks fetch (the critical one)
   if (tracksResult.status === "rejected") {
-    const msg = tracksResult.reason instanceof Error ? tracksResult.reason.message : String(tracksResult.reason);
+    const err = tracksResult.reason;
+    const msg = err instanceof Error ? err.message : String(err);
+    const status = (err as { status?: number })?.status;
     if (msg.includes("credentials") || msg.includes("not configured")) {
       credentialsMissing = true;
+    } else if (status === 403 || status === 404) {
+      fetchError = "This playlist is private or unavailable. In Spotify, open the playlist → ··· → Make public, then refresh.";
     } else {
       fetchError = msg || "Could not load tracks from Spotify.";
     }
